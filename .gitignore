@@ -111,3 +111,5 @@ uploads/
 .temp
 tmp/
 *.tmp
+.vercel
+.env*.local
