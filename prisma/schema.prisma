@@ -1,0 +1,125 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  STUDENT
+  PROFESSOR
+  ADMINISTRATIVE
+}
+
+enum EstadoContrato {
+  PENDIENTE
+  ACEPTADO
+  RECHAZADO
+}
+
+enum EstadoInforme {
+  PENDIENTE
+  ACEPTADO
+  RECHAZADO
+}
+
+model User {
+  id       String   @id @default(cuid())
+  name     String?
+  email    String   @unique
+  password String
+  role     Role     @default(STUDENT)
+  accounts Account[]
+  sessions Session[]
+
+  cursosImpartidos Curso[]   @relation("CursosDelProfesor") // como profesor
+  contratos        Contrato[]
+  informes         Informe[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  user              User    @relation(fields: [userId], references: [id])
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  expires      DateTime
+}
+
+model Oportunidad {
+  id          String   @id @default(uuid())
+  titulo      String
+  descripcion String
+  imagen      String?
+  createdAt   DateTime @default(now())
+}
+
+model Curso {
+  id              String   @id @default(cuid())
+  nombre          String
+  profesorId      String
+  profesor        User     @relation(name: "CursosDelProfesor", fields: [profesorId], references: [id])
+  profesorImagen  String?
+  createdAt       DateTime @default(now())
+
+  contratos       Contrato[]
+  informes        Informe[]
+  novedades       Novedad[]
+}
+
+model Contrato {
+  id         String         @id @default(cuid())
+  archivo    String
+  estado     EstadoContrato @default(PENDIENTE)
+  comentario String?
+  fechaLimite DateTime?
+  alumnoId   String
+  cursoId    String
+  createdAt  DateTime       @default(now())
+
+  alumno     User           @relation(fields: [alumnoId], references: [id])
+  curso      Curso          @relation(fields: [cursoId], references: [id])
+}
+
+model Informe {
+  id        String   @id @default(cuid())
+  cursoId   String
+  alumnoId  String
+  archivo   String   // URL del archivo PDF
+  estado    String   @default("PENDIENTE") // PENDIENTE, ACEPTADO, RECHAZADO
+  feedback  String?  // Comentarios del profesor
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  curso     Curso    @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+  alumno    User     @relation(fields: [alumnoId], references: [id], onDelete: Cascade)
+
+  @@unique([cursoId, alumnoId]) // Un estudiante solo puede tener un informe por curso
+}
+model Novedad {
+  id        String   @id @default(cuid())
+  contenido String
+  cursoId   String
+  createdAt DateTime @default(now())
+
+  curso     Curso    @relation(fields: [cursoId], references: [id])
+}
