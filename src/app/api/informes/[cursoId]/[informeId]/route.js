@@ -1,49 +1,184 @@
+// app/api/informes/[cursoId]/route.js
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from "@/lib/auth";
-import prisma from '../../../../../lib/prisma';
+import prisma from '@/lib/prisma';
+import { put } from '@vercel/blob';
 
-// PUT: Actualizar estado y feedback de un informe (solo profesores)
-export async function PUT(request, { params }) {
+// ============================================
+// HELPERS DE RESPUESTA
+// ============================================
+
+function successResponse(data, message = 'Operación exitosa', status = 200) {
+  return NextResponse.json(
+    {
+      success: true,
+      message,
+      data
+    },
+    { status }
+  );
+}
+
+function errorResponse(message, status = 400) {
+  return NextResponse.json(
+    {
+      success: false,
+      error: message,
+      message
+    },
+    { status }
+  );
+}
+
+// ============================================
+// GET - Obtener informes
+// ============================================
+export async function GET(request, { params }) {
+  console.log('[API] 📋 Solicitando informes');
+  
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== 'PROFESSOR') {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
-    }
+    const { cursoId } = await params;
 
-    const { cursoId, informeId } = await params;
-    const { estado, feedback } = await request.json();
-
-    // Validar que el estado sea válido
-    const estadosValidos = ['PENDIENTE', 'ACEPTADO', 'RECHAZADO'];
-    if (estado && !estadosValidos.includes(estado)) {
-      return NextResponse.json({ error: 'Estado inválido' }, { status: 400 });
-    }
-
-    // Verificar que el informe pertenece al curso
-    const informe = await prisma.informe.findUnique({
-      where: { id: informeId },
+    const informes = await prisma.informe.findMany({
+      where: { cursoId },
+      include: {
+        alumno: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
     });
 
-    if (!informe || informe.cursoId !== cursoId) {
-      return NextResponse.json({ error: 'Informe no encontrado' }, { status: 404 });
-    }
+    console.log(`[API] ✅ Retornando ${informes.length} informes`);
+    
+    return successResponse(
+      informes,
+      'Informes obtenidos correctamente'
+    );
 
-    // Verificar que el profesor es dueño del curso
-    const curso = await prisma.curso.findUnique({
-      where: { id: cursoId },
+  } catch (error) {
+    console.error('[API] ❌ Error al obtener informes:', error);
+    return errorResponse('Error al obtener informes', 500);
+  }
+}
+
+// ============================================
+// POST - Crear informe (SIN AUTENTICACIÓN)
+// ============================================
+export async function POST(request, { params }) {
+  console.log('[API] 📝 Iniciando registro de informe');
+
+  try {
+    const { cursoId } = await params;
+    const formData = await request.formData();
+    const archivo = formData.get('archivo');
+    const alumnoEmail = formData.get('alumnoEmail');
+
+    console.log('[API] 📦 Datos recibidos:', { 
+      cursoId,
+      alumnoEmail,
+      archivoNombre: archivo?.name,
+      archivoTamaño: archivo?.size
     });
 
-    if (!curso || curso.profesorId !== session.user.id) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+    // ============================================
+    // VALIDACIONES
+    // ============================================
+    
+    if (!alumnoEmail || !alumnoEmail.trim()) {
+      console.log('[API] ❌ Email de alumno no proporcionado');
+      return errorResponse('El email del alumno es obligatorio', 400);
     }
 
-    // Actualizar el informe
-    const informeActualizado = await prisma.informe.update({
-      where: { id: informeId },
+    if (!archivo) {
+      console.log('[API] ❌ Archivo no proporcionado');
+      return errorResponse('No se proporcionó archivo', 400);
+    }
+
+    if (archivo.type !== 'application/pdf') {
+      console.log('[API] ❌ Tipo de archivo inválido');
+      return errorResponse('Solo se permiten archivos PDF', 400);
+    }
+
+    if (archivo.size > 10 * 1024 * 1024) {
+      console.log('[API] ❌ Archivo muy grande');
+      return errorResponse('El archivo no debe superar los 10MB', 400);
+    }
+
+    console.log('[API] ✅ Validación exitosa');
+
+    // ============================================
+    // BUSCAR O CREAR ALUMNO
+    // ============================================
+    
+    let alumno = await prisma.user.findUnique({
+      where: { email: alumnoEmail.trim() },
+    });
+
+    if (!alumno) {
+      console.log('[API] 👤 Creando nuevo alumno:', alumnoEmail);
+      
+      alumno = await prisma.user.create({
+        data: {
+          email: alumnoEmail.trim(),
+          name: alumnoEmail.split('@')[0],
+          role: 'STUDENT',
+          password: '',
+        },
+      });
+    }
+
+    console.log('[API] ✅ Alumno identificado. ID:', alumno.id);
+
+    // ============================================
+    // VERIFICAR DUPLICADOS
+    // ============================================
+    
+    const informeExistente = await prisma.informe.findFirst({
+      where: {
+        cursoId,
+        alumnoId: alumno.id,
+      },
+    });
+
+    if (informeExistente) {
+      console.log('[API] ⚠️ Ya existe un informe para este alumno');
+      return errorResponse(
+        'Ya tienes un informe subido para este curso',
+        400
+      );
+    }
+
+    // ============================================
+    // SUBIR A VERCEL BLOB
+    // ============================================
+    
+    console.log('[API] 📤 Subiendo archivo a Vercel Blob...');
+    
+    const timestamp = Date.now();
+    const fileName = `${timestamp}_${alumno.id}_${archivo.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+    
+    const blob = await put(`informes/${fileName}`, archivo, {
+      access: 'public',
+    });
+
+    console.log('[API] ✅ Archivo subido. URL:', blob.url);
+
+    // ============================================
+    // CREAR INFORME EN BD
+    // ============================================
+    
+    console.log('[API] 💾 Insertando en BD...');
+
+    const nuevoInforme = await prisma.informe.create({
       data: {
-        ...(estado && { estado }),
-        ...(feedback !== undefined && { feedback }),
+        cursoId,
+        alumnoId: alumno.id,
+        archivo: blob.url,
+        estado: 'PENDIENTE',
       },
       include: {
         alumno: {
@@ -56,56 +191,20 @@ export async function PUT(request, { params }) {
       },
     });
 
-    return NextResponse.json(informeActualizado);
+    console.log('[API] ✅ Informe registrado. ID:', nuevoInforme.id);
+
+    return successResponse(
+      nuevoInforme,
+      '✅ Informe registrado correctamente',
+      201
+    );
+
   } catch (error) {
-    console.error('Error al actualizar informe:', error);
-    return NextResponse.json({ error: 'Error al actualizar informe' }, { status: 500 });
-  }
-}
-
-// DELETE: Eliminar un informe (solo el estudiante que lo subió)
-export async function DELETE(request, { params }) {
-  try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
-    }
-
-    const { cursoId, informeId } = await params;
-
-    // Buscar el informe
-    const informe = await prisma.informe.findUnique({
-      where: { id: informeId },
-    });
-
-    if (!informe || informe.cursoId !== cursoId) {
-      return NextResponse.json({ error: 'Informe no encontrado' }, { status: 404 });
-    }
-
-    // Verificar que el estudiante es el dueño del informe
-    if (session.user.role === 'STUDENT' && informe.alumnoId !== session.user.id) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
-    }
-
-    // Verificar que el profesor es dueño del curso (si es profesor)
-    if (session.user.role === 'PROFESSOR') {
-      const curso = await prisma.curso.findUnique({
-        where: { id: cursoId },
-      });
-
-      if (!curso || curso.profesorId !== session.user.id) {
-        return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
-      }
-    }
-
-    // Eliminar el informe de la base de datos
-    await prisma.informe.delete({
-      where: { id: informeId },
-    });
-
-    return NextResponse.json({ message: 'Informe eliminado exitosamente' });
-  } catch (error) {
-    console.error('Error al eliminar informe:', error);
-    return NextResponse.json({ error: 'Error al eliminar informe' }, { status: 500 });
+    console.error('[API] ❌ Error al crear informe:', error);
+    
+    return errorResponse(
+      'Error al crear informe: ' + error.message,
+      500
+    );
   }
 }

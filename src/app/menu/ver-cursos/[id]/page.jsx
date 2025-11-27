@@ -73,7 +73,7 @@ const useNovedades = (cursoId) => {
   return { novedades, loading, crearNovedad };
 };
 
-const useContratos = (cursoId) => {
+const useContratos = (cursoId, alumnoEmail) => {
   const [contratos, setContratos] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -93,7 +93,7 @@ const useContratos = (cursoId) => {
     fetchContratos();
   }, [cursoId]);
 
-  const subirContrato = useCallback(async (archivo) => {
+    const subirContrato = useCallback(async (archivo) => {
     if (!archivo) return { success: false, error: 'No hay archivo' };
     if (archivo.type !== 'application/pdf') {
       return { success: false, error: 'Solo se permiten archivos PDF' };
@@ -105,6 +105,10 @@ const useContratos = (cursoId) => {
     try {
       const formData = new FormData();
       formData.append('archivo', archivo);
+      formData.append('alumnoEmail', alumnoEmail);  // ← ✅ AGREGADO
+
+      console.log('📤 Subiendo contrato...', { cursoId, alumnoEmail });
+
       const res = await fetch(`/api/contratos/${cursoId}`, {
         method: 'POST',
         body: formData,
@@ -119,9 +123,10 @@ const useContratos = (cursoId) => {
         return { success: false, error: error.error || 'Error al subir' };
       }
     } catch (error) {
+      console.error('❌ Error al subir contrato:', error);
       return { success: false, error: 'Error de conexión' };
     }
-  }, [cursoId]);
+  }, [cursoId, alumnoEmail]);
 
   const actualizarContrato = useCallback(async (contratoId, estado, comentario = '') => {
     try {
@@ -161,7 +166,7 @@ const useContratos = (cursoId) => {
   return { contratos, loading, subirContrato, actualizarContrato, eliminarContrato };
 };
 
-const useInformes = (cursoId) => {
+const useInformes = (cursoId, alumnoEmail) => {
   const [informes, setInformes] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -190,9 +195,13 @@ const useInformes = (cursoId) => {
       return { success: false, error: 'El archivo no debe superar los 10MB' };
     }
 
-    try {
+   try {
       const formData = new FormData();
       formData.append('archivo', archivo);
+      formData.append('alumnoEmail', alumnoEmail);  // ← ✅ AGREGADO
+
+      console.log('📤 Subiendo informe...', { cursoId, alumnoEmail });
+
       const res = await fetch(`/api/informes/${cursoId}`, {
         method: 'POST',
         body: formData,
@@ -209,7 +218,7 @@ const useInformes = (cursoId) => {
     } catch (error) {
       return { success: false, error: 'Error de conexión' };
     }
-  }, [cursoId]);
+  }, [cursoId, alumnoEmail]);
 
   const actualizarInforme = useCallback(async (informeId, estado, feedback = '') => {
     try {
@@ -896,18 +905,24 @@ export default function CursoDetallePage() {
 
   const { curso, loading: cursoLoading } = useCursoData(id);
   const { novedades, crearNovedad } = useNovedades(id);
+  
+  // ✅ AGREGADO: Obtener email del usuario
+  const alumnoEmail = session?.user?.email;
+  
+  // ✅ MODIFICADO: Pasar alumnoEmail a los hooks
   const {
     contratos,
     subirContrato,
     actualizarContrato,
     eliminarContrato,
-  } = useContratos(id);
+  } = useContratos(id, alumnoEmail);
+  
   const {
     informes,
     subirInforme,
     actualizarInforme,
     eliminarInforme,
-  } = useInformes(id);
+  } = useInformes(id, alumnoEmail);
 
   const user = session?.user;
   const isProfessor = user?.role === 'PROFESSOR';
@@ -922,12 +937,18 @@ export default function CursoDetallePage() {
   if (!session) return <UnauthorizedScreen />;
   if (cursoLoading || !curso) return <LoadingScreen message="Cargando curso..." />;
 
+  // ✅ DEBUGGING: Ver en consola
+  console.log('🔍 Session:', { email: alumnoEmail, role: user?.role });
+
   return (
     <div className="min-h-screen text-white bg-gradient-to-br from-black via-blue-950 to-black">
       <PageHeader curso={curso} onBack={() => router.push('/menu/ver-cursos')} />
       <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} tabs={tabs} />
 
       <main className="container mx-auto px-4 py-6 sm:py-8 max-w-6xl">
+        {/* Los componentes de sección permanecen IGUAL, 
+            pero ahora los hooks ya tienen el alumnoEmail */}
+        
         {activeTab === 'novedades' && (
           <NovedadesSection
             novedades={novedades}
