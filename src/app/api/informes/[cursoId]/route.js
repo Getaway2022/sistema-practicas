@@ -2,7 +2,8 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { put } from '@vercel/blob';
-
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
 // ============================================
 // GET - Obtener informes (SIN AUTH)
 // ============================================
@@ -58,11 +59,20 @@ export async function POST(request, { params }) {
     if (!cursoId) {
       return NextResponse.json({ error: 'cursoId requerido' }, { status: 400 });
     }
+const session = await getServerSession(authOptions);  // ✅ AGREGAR
 
+if (!session?.user?.email) {
+  console.log('[API INFORMES] ❌ Sin sesión válida');
+  return NextResponse.json({ 
+    error: 'Debes iniciar sesión' 
+  }, { status: 401 });
+}
+
+const alumnoEmail = session.user.email;  //
     // 2. Obtener FormData
     const formData = await request.formData();
     const archivo = formData.get('archivo');
-    const alumnoEmail = formData.get('alumnoEmail');
+
 
     console.log('[API INFORMES] 📦 Datos recibidos:', { 
       cursoId,
