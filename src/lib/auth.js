@@ -1,14 +1,11 @@
-import NextAuth from "next-auth";
-import CredentialsProvider from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { PrismaClient } from "@prisma/client";
+import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcrypt";
-import { authOptions } from "@/lib/auth";
 
 const prisma = new PrismaClient();
 
-// Cambia de "export const" a solo "const"
-const authOptions = {
+export const authOptions = {
   adapter: PrismaAdapter(prisma),
   providers: [
     CredentialsProvider({
@@ -54,6 +51,3 @@ const authOptions = {
   },
   secret: process.env.NEXTAUTH_SECRET,
 };
-
-const handler = NextAuth(authOptions);
-export { handler as GET, handler as POST };

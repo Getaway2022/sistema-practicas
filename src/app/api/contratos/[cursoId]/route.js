@@ -3,8 +3,7 @@ import { writeFile } from 'fs/promises';
 import path from 'path';
 import { v4 as uuid } from 'uuid';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '../../auth/[...nextauth]/route';
-
+import { authOptions } from "@/lib/auth";
 const prisma = new PrismaClient();
 
 export async function GET(req, context) {
