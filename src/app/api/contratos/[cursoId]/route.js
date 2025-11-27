@@ -1,12 +1,13 @@
 // app/api/contratos/[cursoId]/route.js
-import { PrismaClient } from '@prisma/client';
+// app/api/contratos/[cursoId]/route.js
+import prisma from '@/lib/prisma'; // ✅ CAMBIO 1: Usar singleton en lugar de new PrismaClient()
 import { put, del } from '@vercel/blob';
 import { NextResponse } from 'next/server';
-
-const prisma = new PrismaClient();
+import { getServerSession } from 'next-auth/next'; // ✅ CAMBIO 2: Agregar autenticación
+import { authOptions } from '@/lib/auth'; // ✅ CAMBIO 3: Importar authOptions
 
 // ============================================
-// GET - Obtener contratos (SIN AUTH)
+// GET - Obtener contratos
 // ============================================
 export async function GET(req, context) {
   console.log('[API CONTRATOS] 📋 GET - Iniciando');
@@ -35,31 +36,53 @@ export async function GET(req, context) {
 
     console.log(`[API CONTRATOS] ✅ Retornando ${contratos.length} contratos`);
     
-    return new Response(JSON.stringify(contratos), {
-      headers: { 'Content-Type': 'application/json' }
+    return NextResponse.json({
+      success: true,
+      data: contratos
     });
 
   } catch (error) {
     console.error('[API CONTRATOS] ❌ Error GET:', error);
     return NextResponse.json({ 
+      success: false,
       error: 'Error al obtener contratos: ' + error.message 
     }, { status: 500 });
   }
 }
 
 // ============================================
-// POST - Crear contrato (SIN AUTH + VERCEL BLOB)
+// POST - Crear contrato
 // ============================================
 export async function POST(req, context) {
   console.log('[API CONTRATOS] 📝 POST - Iniciando');
 
   try {
+    // ✅ CAMBIO 4: Obtener sesión del servidor
+    const session = await getServerSession(authOptions);
+    
+    console.log('[API CONTRATOS] 🔐 Sesión:', {
+      hasSession: !!session,
+      email: session?.user?.email,
+      role: session?.user?.role
+    });
+
+    if (!session?.user?.email) {
+      console.log('[API CONTRATOS] ❌ Sin sesión válida');
+      return NextResponse.json({ 
+        success: false,
+        error: 'Debes iniciar sesión para subir contratos' 
+      }, { status: 401 });
+    }
+
     const params = await context.params;
     const cursoId = params?.cursoId;
 
     if (!cursoId) {
       console.error('[API CONTRATOS] ❌ cursoId no proporcionado');
-      return NextResponse.json({ error: 'cursoId requerido' }, { status: 400 });
+      return NextResponse.json({ 
+        success: false,
+        error: 'cursoId requerido' 
+      }, { status: 400 });
     }
 
     console.log('[API CONTRATOS] ✅ cursoId:', cursoId);
@@ -71,12 +94,15 @@ export async function POST(req, context) {
     } catch (formError) {
       console.error('[API CONTRATOS] ❌ Error al parsear FormData:', formError);
       return NextResponse.json({ 
+        success: false,
         error: 'Error al procesar el formulario' 
       }, { status: 400 });
     }
 
     const archivo = formData.get('archivo');
-    const alumnoEmail = formData.get('alumnoEmail');
+    
+    // ✅ CAMBIO 5: Usar email de la sesión (más confiable)
+    const alumnoEmail = session.user.email;
 
     console.log('[API CONTRATOS] 📦 Datos recibidos:', { 
       cursoId,
@@ -88,16 +114,10 @@ export async function POST(req, context) {
     });
 
     // Validaciones
-    if (!alumnoEmail || !alumnoEmail.trim()) {
-      console.error('[API CONTRATOS] ❌ Email no proporcionado');
-      return NextResponse.json({ 
-        error: 'El email del alumno es obligatorio' 
-      }, { status: 400 });
-    }
-
     if (!archivo || typeof archivo === 'string') {
       console.error('[API CONTRATOS] ❌ Archivo no válido');
       return NextResponse.json({ 
+        success: false,
         error: 'Debes seleccionar un archivo PDF válido' 
       }, { status: 400 });
     }
@@ -105,6 +125,7 @@ export async function POST(req, context) {
     if (archivo.type !== 'application/pdf') {
       console.error('[API CONTRATOS] ❌ Tipo inválido:', archivo.type);
       return NextResponse.json({ 
+        success: false,
         error: 'Solo se permiten archivos PDF' 
       }, { status: 400 });
     }
@@ -112,39 +133,27 @@ export async function POST(req, context) {
     if (archivo.size > 10 * 1024 * 1024) {
       console.error('[API CONTRATOS] ❌ Archivo muy grande:', archivo.size);
       return NextResponse.json({ 
+        success: false,
         error: 'El archivo no debe superar los 10MB' 
       }, { status: 400 });
     }
 
     console.log('[API CONTRATOS] ✅ Validaciones pasadas');
 
-    // Buscar o crear alumno
-    let alumno = await prisma.user.findUnique({
-      where: { email: alumnoEmail.trim() },
+    // ✅ CAMBIO 6: Solo buscar usuario, no crear (debe estar registrado)
+    const alumno = await prisma.user.findUnique({
+      where: { email: alumnoEmail },
     });
 
     if (!alumno) {
-      console.log('[API CONTRATOS] 👤 Creando nuevo alumno:', alumnoEmail);
-      
-      try {
-        alumno = await prisma.user.create({
-          data: {
-            email: alumnoEmail.trim(),
-            name: alumnoEmail.split('@')[0],
-            role: 'STUDENT',
-            password: '',
-          },
-        });
-        console.log('[API CONTRATOS] ✅ Alumno creado:', alumno.id);
-      } catch (createError) {
-        console.error('[API CONTRATOS] ❌ Error al crear alumno:', createError);
-        return NextResponse.json({ 
-          error: 'Error al crear usuario: ' + createError.message 
-        }, { status: 500 });
-      }
-    } else {
-      console.log('[API CONTRATOS] ✅ Alumno encontrado:', alumno.id);
+      console.log('[API CONTRATOS] ❌ Usuario no encontrado:', alumnoEmail);
+      return NextResponse.json({ 
+        success: false,
+        error: 'Usuario no encontrado. Asegúrate de haber iniciado sesión correctamente.' 
+      }, { status: 404 });
     }
+
+    console.log('[API CONTRATOS] ✅ Alumno encontrado:', alumno.id);
 
     // Verificar duplicados
     const contratoExistente = await prisma.contrato.findFirst({
@@ -157,6 +166,7 @@ export async function POST(req, context) {
     if (contratoExistente) {
       console.log('[API CONTRATOS] ⚠️ Ya existe un contrato');
       return NextResponse.json({ 
+        success: false,
         error: 'Ya existe un contrato para este alumno en este curso. Elimina el anterior antes de subir uno nuevo.' 
       }, { status: 400 });
     }
@@ -165,12 +175,13 @@ export async function POST(req, context) {
     if (!process.env.BLOB_READ_WRITE_TOKEN) {
       console.error('[API CONTRATOS] ❌ BLOB_READ_WRITE_TOKEN no configurado');
       return NextResponse.json({ 
-        error: 'Error de configuración del servidor (BLOB_READ_WRITE_TOKEN). Contacta al administrador.' 
+        success: false,
+        error: 'Error de configuración del servidor. Contacta al administrador.' 
       }, { status: 500 });
     }
 
     // ============================================
-    // 🔥 SUBIR A VERCEL BLOB (NO AL FILESYSTEM)
+    // SUBIR A VERCEL BLOB
     // ============================================
     console.log('[API CONTRATOS] 📤 Subiendo archivo a Vercel Blob...');
     
@@ -182,7 +193,6 @@ export async function POST(req, context) {
 
     let blob;
     try {
-      // ✅ ESTO ES LO CORRECTO: Subir directamente a Vercel Blob
       blob = await put(blobFileName, archivo, {
         access: 'public',
       });
@@ -194,7 +204,8 @@ export async function POST(req, context) {
       console.error('[API CONTRATOS] ❌ Error al subir a Vercel Blob:', blobError);
       console.error('[API CONTRATOS] ❌ Stack:', blobError.stack);
       return NextResponse.json({ 
-        error: 'Error al subir el archivo a Vercel Blob. Verifica la configuración.' 
+        success: false,
+        error: 'Error al subir el archivo. Intenta nuevamente.' 
       }, { status: 500 });
     }
 
@@ -205,7 +216,7 @@ export async function POST(req, context) {
     try {
       contrato = await prisma.contrato.create({
         data: {
-          archivo: blob.url,  // ✅ Guardar la URL de Vercel Blob
+          archivo: blob.url,
           estado: 'PENDIENTE',
           alumnoId: alumno.id,
           cursoId,
@@ -235,14 +246,17 @@ export async function POST(req, context) {
       }
       
       return NextResponse.json({ 
+        success: false,
         error: 'Error al guardar en base de datos: ' + dbError.message 
       }, { status: 500 });
     }
 
-    return new Response(JSON.stringify(contrato), {
-      status: 201,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    // ✅ CAMBIO 7: Respuesta consistente con formato {success, data, message}
+    return NextResponse.json({
+      success: true,
+      message: 'Contrato registrado correctamente',
+      data: contrato
+    }, { status: 201 });
 
   } catch (error) {
     console.error('[API CONTRATOS] ❌ ERROR CRÍTICO');
@@ -251,13 +265,14 @@ export async function POST(req, context) {
     console.error('[API CONTRATOS] Stack:', error.stack);
     
     return NextResponse.json({ 
+      success: false,
       error: 'Error interno del servidor: ' + error.message 
     }, { status: 500 });
   }
 }
 
 // ============================================
-// DELETE - Eliminar contrato (SIN AUTH)
+// DELETE - Eliminar contrato
 // ============================================
 export async function DELETE(req, context) {
   console.log('[API CONTRATOS] 🗑️ DELETE - Iniciando');
@@ -271,6 +286,7 @@ export async function DELETE(req, context) {
 
     if (!contratoId) {
       return NextResponse.json({ 
+        success: false,
         error: 'contratoId es requerido' 
       }, { status: 400 });
     }
@@ -282,6 +298,7 @@ export async function DELETE(req, context) {
 
     if (!contrato) {
       return NextResponse.json({ 
+        success: false,
         error: 'Contrato no encontrado' 
       }, { status: 404 });
     }
@@ -301,16 +318,15 @@ export async function DELETE(req, context) {
 
     console.log('[API CONTRATOS] ✅ Contrato eliminado de BD');
 
-    return new Response(JSON.stringify({ 
+    return NextResponse.json({ 
       success: true,
       message: 'Contrato eliminado correctamente' 
-    }), {
-      headers: { 'Content-Type': 'application/json' }
     });
 
   } catch (error) {
     console.error('[API CONTRATOS] ❌ Error DELETE:', error);
     return NextResponse.json({ 
+      success: false,
       error: 'Error al eliminar: ' + error.message 
     }, { status: 500 });
   }
