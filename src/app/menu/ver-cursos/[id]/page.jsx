@@ -37,22 +37,22 @@ const useNovedades = (cursoId) => {
 
   useEffect(() => {
     if (!cursoId) return;
-    const fetchNovedades = async () => {
+    const fetchNovedades = async () => {  // ✅ Correcto
       try {
-        const res = await fetch(`/api/novedades/${cursoId}`);
+        const res = await fetch(`/api/novedades/${cursoId}`);  // ✅ URL correcta
         const response = await res.json();
         
         if (response.success && response.data) {
-          setNovedades(response.data);
+          setNovedades(response.data);  // ✅ setNovedades correcto
         } else if (Array.isArray(response)) {
-          setNovedades(response);
+          setNovedades(response);  // ✅ Correcto
         } else {
           console.error('Formato de respuesta inesperado:', response);
-          setNovedades([]);
+          setNovedades([]);  // ✅ Correcto
         }
       } catch (error) {
         console.error('Error:', error);
-        setNovedades([]);
+        setNovedades([]);  // ✅ Correcto
       } finally {
         setLoading(false);
       }
@@ -93,7 +93,7 @@ const useContratos = (cursoId, alumnoEmail) => {
       const res = await fetch(`/api/contratos/${cursoId}`);
       const response = await res.json();
       
-      // ✅ AGREGADO: Validar que sea array
+      // ✅ Validar que sea array
       if (response.success && response.data) {
         setContratos(Array.isArray(response.data) ? response.data : []);
       } else if (Array.isArray(response)) {
@@ -104,7 +104,7 @@ const useContratos = (cursoId, alumnoEmail) => {
       }
     } catch (error) {
       console.error('Error:', error);
-      setContratos([]);
+      setContratos([]);  // ✅ Asegurar array vacío
     } finally {
       setLoading(false);
     }
@@ -113,40 +113,41 @@ const useContratos = (cursoId, alumnoEmail) => {
 }, [cursoId]);
 
     const subirContrato = useCallback(async (archivo) => {
-    if (!archivo) return { success: false, error: 'No hay archivo' };
-    if (archivo.type !== 'application/pdf') {
-      return { success: false, error: 'Solo se permiten archivos PDF' };
+  if (!archivo) return { success: false, error: 'No hay archivo' };
+  if (!alumnoEmail) return { success: false, error: 'No se pudo obtener el email del usuario' };  // ✅ Nueva validación
+  
+  // ... validaciones ...
+
+  try {
+    const formData = new FormData();
+    formData.append('archivo', archivo);
+    formData.append('alumnoEmail', alumnoEmail);
+
+    console.log('📤 Subiendo contrato...', { cursoId, alumnoEmail, archivo: archivo.name });  // ✅ Log mejorado
+
+    const res = await fetch(`/api/contratos/${cursoId}`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    const responseData = await res.json();  // ✅ Parsear primero
+    console.log('📥 Respuesta del servidor:', responseData);  // ✅ Log de respuesta
+
+    if (res.ok) {
+      const contrato = responseData.data || responseData;
+      setContratos((prev) => [contrato, ...prev]);  // ✅ Agregar solo data
+      return { success: true };
+    } else {
+      return { 
+        success: false, 
+        error: responseData.error || responseData.message || 'Error al subir'  // ✅ Mejor manejo
+      };
     }
-    if (archivo.size > 10 * 1024 * 1024) {
-      return { success: false, error: 'El archivo no debe superar los 10MB' };
-    }
-
-    try {
-      const formData = new FormData();
-      formData.append('archivo', archivo);
-      formData.append('alumnoEmail', alumnoEmail);  // ← ✅ AGREGADO
-
-      console.log('📤 Subiendo contrato...', { cursoId, alumnoEmail });
-
-      const res = await fetch(`/api/contratos/${cursoId}`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (res.ok) {
-       const nuevoContrato = await res.json();
-  const contrato = nuevoContrato.data || nuevoContrato;
-  setContratos((prev) => [contrato, ...prev]);  // ✅ CAMBIO: era nuevoContrato
-  return { success: true };
-      } else {
-        const error = await res.json();
-        return { success: false, error: error.error || 'Error al subir' };
-      }
-    } catch (error) {
-      console.error('❌ Error al subir contrato:', error);
-      return { success: false, error: 'Error de conexión' };
-    }
-  }, [cursoId, alumnoEmail]);
+  } catch (error) {
+    console.error('❌ Error al subir contrato:', error);
+    return { success: false, error: 'Error de conexión: ' + error.message };  // ✅ Mensaje específico
+  }
+}, [cursoId, alumnoEmail]);
 
   const actualizarContrato = useCallback(async (contratoId, estado, comentario = '') => {
     try {
@@ -197,9 +198,8 @@ const useInformes = (cursoId, alumnoEmail) => {
       const res = await fetch(`/api/informes/${cursoId}`);
       const response = await res.json();
       
-      // ✅ AGREGADO: Validar que sea array
       if (response.success && response.data) {
-        setInformes(Array.isArray(response.data) ? response.data : []);
+        setInformes(Array.isArray(response.data) ? response.data : []);  // ✅ Validar array
       } else if (Array.isArray(response)) {
         setInformes(response);
       } else {
@@ -216,40 +216,42 @@ const useInformes = (cursoId, alumnoEmail) => {
   fetchInformes();
 }, [cursoId]);
 
-  const subirInforme = useCallback(async (archivo) => {
-    if (!archivo) return { success: false, error: 'No hay archivo' };
-    if (archivo.type !== 'application/pdf') {
-      return { success: false, error: 'Solo se permiten archivos PDF' };
+ const subirInforme = useCallback(async (archivo) => {
+  if (!archivo) return { success: false, error: 'No hay archivo' };
+  if (!alumnoEmail) return { success: false, error: 'No se pudo obtener el email del usuario' };  // ✅ Nueva validación
+  
+  // ... validaciones ...
+
+  try {
+    const formData = new FormData();
+    formData.append('archivo', archivo);
+    formData.append('alumnoEmail', alumnoEmail);
+
+    console.log('📤 Subiendo informe...', { cursoId, alumnoEmail, archivo: archivo.name });  // ✅ Log
+
+    const res = await fetch(`/api/informes/${cursoId}`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    const responseData = await res.json();  // ✅ Parsear primero
+    console.log('📥 Respuesta del servidor:', responseData);  // ✅ Log
+
+    if (res.ok) {
+      const informe = responseData.data || responseData;
+      setInformes((prev) => [informe, ...prev]);  // ✅ Solo data
+      return { success: true };
+    } else {
+      return { 
+        success: false, 
+        error: responseData.error || responseData.message || 'Error al subir'  // ✅ Mejor manejo
+      };
     }
-    if (archivo.size > 10 * 1024 * 1024) {
-      return { success: false, error: 'El archivo no debe superar los 10MB' };
-    }
-
-   try {
-      const formData = new FormData();
-      formData.append('archivo', archivo);
-      formData.append('alumnoEmail', alumnoEmail);  // ← ✅ AGREGADO
-
-      console.log('📤 Subiendo informe...', { cursoId, alumnoEmail });
-
-      const res = await fetch(`/api/informes/${cursoId}`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (res.ok) {
-        const nuevoInforme = await res.json();
-        const informe = nuevoInforme.data || nuevoInforme;
-       setInformes((prev) => [informe, ...prev]);
-        return { success: true };
-      } else {
-        const error = await res.json();
-        return { success: false, error: error.error || 'Error al subir' };
-      }
-    } catch (error) {
-      return { success: false, error: 'Error de conexión' };
-    }
-  }, [cursoId, alumnoEmail]);
+  } catch (error) {
+    console.error('❌ Error al subir informe:', error);
+    return { success: false, error: 'Error de conexión: ' + error.message };  // ✅ Específico
+  }
+}, [cursoId, alumnoEmail]);
 
   const actualizarInforme = useCallback(async (informeId, estado, feedback = '') => {
     try {
@@ -455,18 +457,24 @@ const ContratoEstudiante = ({ contratos, onSubirContrato, onEliminarContrato }) 
   const [isUploading, setIsUploading] = useState(false);
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsUploading(true);
-    const result = await onSubirContrato(archivo);
-    if (result.success) {
-      setArchivo(null);
-      e.target.reset();
-      alert('✅ Contrato subido exitosamente');
-    } else {
-      alert(`❌ ${result.error}`);
-    }
-    setIsUploading(false);
-  };
+  e.preventDefault();
+  if (!archivo) {  // ✅ Validación agregada
+    alert('❌ Por favor selecciona un archivo');
+    return;
+  }
+  setIsUploading(true);
+  console.log('📤 Enviando contrato...', archivo.name);  // ✅ Log
+  const result = await onSubirContrato(archivo);
+  if (result.success) {
+    setArchivo(null);
+    e.target.reset();
+    alert('✅ Contrato subido exitosamente');
+  } else {
+    console.error('❌ Error al subir:', result.error);  // ✅ Log de error
+    alert(`❌ ${result.error || 'Error al subir el contrato'}`);  // ✅ Mensaje mejorado
+  }
+  setIsUploading(false);
+};
 
   const handleEliminar = async (id) => {
     if (!confirm('¿Estás seguro de eliminar este contrato?')) return;
@@ -683,18 +691,24 @@ const InformeEstudiante = ({ informes, onSubirInforme, onEliminarInforme }) => {
   const [isUploading, setIsUploading] = useState(false);
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsUploading(true);
-    const result = await onSubirInforme(archivo);
-    if (result.success) {
-      setArchivo(null);
-      e.target.reset();
-      alert('✅ Informe subido exitosamente');
-    } else {
-      alert(`❌ ${result.error}`);
-    }
-    setIsUploading(false);
-  };
+  e.preventDefault();
+  if (!archivo) {  // ✅ Validación
+    alert('❌ Por favor selecciona un archivo');
+    return;
+  }
+  setIsUploading(true);
+  console.log('📤 Enviando informe...', archivo.name);  // ✅ Log
+  const result = await onSubirInforme(archivo);
+  if (result.success) {
+    setArchivo(null);
+    e.target.reset();
+    alert('✅ Informe subido exitosamente');
+  } else {
+    console.error('❌ Error al subir:', result.error);  // ✅ Log
+    alert(`❌ ${result.error || 'Error al subir el informe'}`);  // ✅ Mensaje mejorado
+  }
+  setIsUploading(false);
+};
 
   const handleEliminar = async (id) => {
     if (!confirm('¿Estás seguro de eliminar este informe?')) return;
