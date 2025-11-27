@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from "@/lib/auth";
 import prisma from '../../../../lib/prisma';
-import { put } from '@vercel/blob'; // 👈 ÚNICO CAMBIO: Importar Vercel Blob
+import { put } from '@vercel/blob';
 
 // GET: Obtener todos los informes de un curso
 export async function GET(request, { params }) {
@@ -30,7 +30,10 @@ export async function GET(request, { params }) {
         orderBy: { createdAt: 'desc' },
       });
 
-      return NextResponse.json(informes);
+      return NextResponse.json({
+        success: true,
+        data: informes
+      });
     }
 
     // Si es estudiante, solo obtener sus propios informes
@@ -43,93 +46,118 @@ export async function GET(request, { params }) {
         orderBy: { createdAt: 'desc' },
       });
 
-      return NextResponse.json(informes);
+      return NextResponse.json({
+        success: true,
+        data: informes
+      });
     }
 
     return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
   } catch (error) {
     console.error('Error al obtener informes:', error);
-    return NextResponse.json({ error: 'Error al obtener informes' }, { status: 500 });
+    return NextResponse.json({ 
+      success: false,
+      error: 'Error al obtener informes: ' + error.message 
+    }, { status: 500 });
   }
 }
 
 // POST: Crear un nuevo informe (solo estudiantes)
 export async function POST(request, { params }) {
+  console.log('[API] 📝 Iniciando registro de informe');
+  
   try {
     const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== 'STUDENT') {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+    if (!session) {
+      return NextResponse.json({ 
+        success: false,
+        error: 'No autenticado' 
+      }, { status: 401 });
     }
 
     const { cursoId } = await params;
     const formData = await request.formData();
     const archivo = formData.get('archivo');
+    const alumnoEmail = formData.get('alumnoEmail');
 
-    if (!archivo) {
-      return NextResponse.json({ error: 'No se proporcionó archivo' }, { status: 400 });
-    }
-
-    // Validar que sea PDF
-    if (archivo.type !== 'application/pdf') {
-      return NextResponse.json({ error: 'Solo se permiten archivos PDF' }, { status: 400 });
-    }
-
-    // Validar tamaño (10MB)
-    if (archivo.size > 10 * 1024 * 1024) {
-      return NextResponse.json({ error: 'El archivo no debe superar los 10MB' }, { status: 400 });
-    }
-
-    // Verificar que el estudiante esté inscrito en el curso
-    // TEMPORAL: Comentado hasta configurar el modelo Inscripcion
-    /*
-    const inscripcion = await prisma.inscripcion.findUnique({
-      where: {
-        alumnoId_cursoId: {
-          alumnoId: session.user.id,
-          cursoId,
-        },
-      },
+    console.log('[API] 📦 Datos recibidos:', { 
+      cursoId,
+      alumnoEmail,
+      sessionEmail: session.user.email,
+      archivoNombre: archivo?.name,
+      archivoTamaño: archivo?.size
     });
 
-    if (!inscripcion) {
-      return NextResponse.json({ error: 'No estás inscrito en este curso' }, { status: 403 });
+    // Validaciones
+    if (!archivo) {
+      return NextResponse.json({ 
+        success: false,
+        error: 'No se proporcionó archivo' 
+      }, { status: 400 });
     }
-    */
 
-    // Verificar si ya existe un informe para este alumno en este curso
+    if (archivo.type !== 'application/pdf') {
+      return NextResponse.json({ 
+        success: false,
+        error: 'Solo se permiten archivos PDF' 
+      }, { status: 400 });
+    }
+
+    if (archivo.size > 10 * 1024 * 1024) {
+      return NextResponse.json({ 
+        success: false,
+        error: 'El archivo no debe superar los 10MB' 
+      }, { status: 400 });
+    }
+
+    // Buscar alumno
+    let alumno = await prisma.user.findUnique({
+      where: { email: alumnoEmail },
+    });
+
+    if (!alumno) {
+      console.log('[API] ❌ Usuario no encontrado:', alumnoEmail);
+      return NextResponse.json({ 
+        success: false,
+        error: 'Usuario no encontrado' 
+      }, { status: 404 });
+    }
+
+    console.log('[API] ✅ Alumno identificado. ID:', alumno.id);
+
+    // Verificar si ya existe un informe
     const informeExistente = await prisma.informe.findFirst({
       where: {
         cursoId,
-        alumnoId: session.user.id,
+        alumnoId: alumno.id,
       },
     });
 
     if (informeExistente) {
-      return NextResponse.json({ error: 'Ya tienes un informe subido para este curso' }, { status: 400 });
+      return NextResponse.json({ 
+        success: false,
+        error: 'Ya tienes un informe subido para este curso. Elimina el anterior antes de subir uno nuevo.' 
+      }, { status: 400 });
     }
 
-    // ========================================
-    // 👇 CAMBIO PRINCIPAL: Subir a Vercel Blob
-    // ========================================
-    // Crear nombre único y seguro para el archivo
-    const timestamp = Date.now();
-    const fileName = `${timestamp}_${session.user.id}_${archivo.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+    // Subir a Vercel Blob
+    console.log('[API] 📤 Subiendo archivo a Vercel Blob...');
     
-    // Subir a Vercel Blob en lugar del sistema de archivos
+    const timestamp = Date.now();
+    const fileName = `${timestamp}_${alumno.id}_${archivo.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+    
     const blob = await put(`informes/${fileName}`, archivo, {
       access: 'public',
     });
 
-    // URL del archivo en Vercel Blob
-    const archivoUrl = blob.url;
-    // ========================================
+    console.log('[API] ✅ Archivo subido. URL:', blob.url);
 
     // Crear el informe en la base de datos
     const nuevoInforme = await prisma.informe.create({
       data: {
         cursoId,
-        alumnoId: session.user.id,
-        archivo: archivoUrl, // 👈 Guardar URL de Vercel Blob
+        alumnoId: alumno.id,
+        archivo: blob.url,
         estado: 'PENDIENTE',
       },
       include: {
@@ -143,11 +171,21 @@ export async function POST(request, { params }) {
       },
     });
 
-    return NextResponse.json(nuevoInforme, { status: 201 });
+    console.log('[API] ✅ Informe registrado. ID:', nuevoInforme.id);
+
+    return NextResponse.json({
+      success: true,
+      message: 'Informe subido correctamente',
+      data: nuevoInforme
+    }, { status: 201 });
+    
   } catch (error) {
-    console.error('Error al crear informe:', error);
+    console.error('[API] ❌ Error al crear informe:', error);
+    console.error('[API] Stack:', error.stack);
+    
     return NextResponse.json({ 
-      error: 'Error al crear informe', 
+      success: false,
+      error: 'Error al crear informe: ' + error.message,
       details: error.message 
     }, { status: 500 });
   }

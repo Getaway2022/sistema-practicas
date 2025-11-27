@@ -1,4 +1,4 @@
-import prisma from '@/lib/prisma'; // ✅ Usar el cliente singleton
+import prisma from '@/lib/prisma';
 import { put } from '@vercel/blob';
 import { NextResponse } from 'next/server';
 
@@ -38,6 +38,10 @@ export async function GET(req, context) {
     const params = await context.params;
     const cursoId = params?.cursoId;
 
+    if (!cursoId) {
+      return errorResponse('cursoId es requerido', 400);
+    }
+
     const contratos = await prisma.contrato.findMany({
       where: { cursoId },
       include: { 
@@ -61,7 +65,7 @@ export async function GET(req, context) {
 
   } catch (error) {
     console.error('[API] ❌ Error al obtener contratos:', error);
-    return errorResponse('Error al obtener contratos', 500);
+    return errorResponse('Error al obtener contratos: ' + error.message, 500);
   }
 }
 
@@ -72,41 +76,69 @@ export async function POST(req, context) {
   console.log('[API] 📝 Iniciando registro de contrato');
 
   try {
+    // ✅ NUEVO: Obtener sesión primero
+    const { getServerSession } = await import('next-auth/next');
+    const { authOptions } = await import('@/lib/auth');
+    const session = await getServerSession(authOptions);
+
+    console.log('[API] 🔐 Sesión:', { 
+      hasSession: !!session, 
+      email: session?.user?.email,
+      role: session?.user?.role 
+    });
+
+    if (!session?.user?.email) {
+      console.log('[API] ❌ No hay sesión válida');
+      return errorResponse('Debes iniciar sesión para subir contratos', 401);
+    }
+
     const params = await context.params;
     const cursoId = params?.cursoId;
 
+    if (!cursoId) {
+      return errorResponse('cursoId es requerido', 400);
+    }
+
     const formData = await req.formData();
     const archivo = formData.get('archivo');
-    const alumnoEmail = formData.get('alumnoEmail');
+    
+    // ✅ USAR EMAIL DE LA SESIÓN en lugar del FormData
+    const alumnoEmail = session.user.email;
 
     console.log('[API] 📦 Datos recibidos:', { 
       cursoId,
       alumnoEmail,
       archivoNombre: archivo?.name,
-      archivoTamaño: archivo?.size
+      archivoTamaño: archivo?.size,
+      formDataKeys: Array.from(formData.keys())
     });
 
     // ============================================
     // VALIDACIONES
     // ============================================
     
-    if (!alumnoEmail || !alumnoEmail.trim()) {
+    if (!alumnoEmail || alumnoEmail.trim() === '') {
       console.log('[API] ❌ Email de alumno no proporcionado');
       return errorResponse('El email del alumno es obligatorio', 400);
     }
 
-    if (!archivo || typeof archivo === 'string') {
-      console.log('[API] ❌ Archivo no válido');
-      return errorResponse('Archivo no válido', 400);
+    if (!archivo) {
+      console.log('[API] ❌ No se proporcionó archivo');
+      return errorResponse('No se proporcionó archivo', 400);
+    }
+
+    if (typeof archivo === 'string') {
+      console.log('[API] ❌ El archivo no es un File válido');
+      return errorResponse('El archivo no es válido', 400);
     }
 
     if (archivo.type !== 'application/pdf') {
-      console.log('[API] ❌ Tipo de archivo inválido');
+      console.log('[API] ❌ Tipo de archivo inválido:', archivo.type);
       return errorResponse('Solo se permiten archivos PDF', 400);
     }
 
     if (archivo.size > 10 * 1024 * 1024) {
-      console.log('[API] ❌ Archivo muy grande');
+      console.log('[API] ❌ Archivo muy grande:', archivo.size);
       return errorResponse('El archivo no debe superar los 10MB', 400);
     }
 
@@ -121,16 +153,8 @@ export async function POST(req, context) {
     });
 
     if (!alumno) {
-      console.log('[API] 👤 Creando nuevo alumno:', alumnoEmail);
-      
-      alumno = await prisma.user.create({
-        data: {
-          email: alumnoEmail.trim(),
-          name: alumnoEmail.split('@')[0],
-          role: 'STUDENT',
-          password: '',
-        },
-      });
+      console.log('[API] 👤 Alumno no encontrado, buscando por email...');
+      return errorResponse('Usuario no encontrado. Asegúrate de haber iniciado sesión correctamente.', 404);
     }
 
     console.log('[API] ✅ Alumno identificado. ID:', alumno.id);
@@ -149,7 +173,7 @@ export async function POST(req, context) {
     if (contratoExistente) {
       console.log('[API] ⚠️ Ya existe un contrato para este alumno');
       return errorResponse(
-        'Ya existe un contrato para este alumno en este curso',
+        'Ya existe un contrato para este alumno en este curso. Elimina el anterior antes de subir uno nuevo.',
         400
       );
     }
@@ -203,6 +227,7 @@ export async function POST(req, context) {
 
   } catch (error) {
     console.error('[API] ❌ Error al crear contrato:', error);
+    console.error('[API] Stack:', error.stack);
     
     return errorResponse(
       'Error al crear contrato: ' + error.message,
