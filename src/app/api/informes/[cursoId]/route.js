@@ -62,28 +62,36 @@ export async function GET(request, { params }) {
   }
 }
 
-// POST: Crear un nuevo informe (solo estudiantes)
+// POST: Crear un nuevo informe
 export async function POST(request, { params }) {
   console.log('[API] 📝 Iniciando registro de informe');
   
   try {
     const session = await getServerSession(authOptions);
-    if (!session) {
+    
+    console.log('[API] 🔐 Sesión:', { 
+      hasSession: !!session, 
+      email: session?.user?.email,
+      role: session?.user?.role 
+    });
+    
+    if (!session?.user?.email) {
       return NextResponse.json({ 
         success: false,
-        error: 'No autenticado' 
+        error: 'Debes iniciar sesión para subir informes' 
       }, { status: 401 });
     }
 
     const { cursoId } = await params;
     const formData = await request.formData();
     const archivo = formData.get('archivo');
-    const alumnoEmail = formData.get('alumnoEmail');
+    
+    // Usar email de la sesión
+    const alumnoEmail = session.user.email;
 
     console.log('[API] 📦 Datos recibidos:', { 
       cursoId,
       alumnoEmail,
-      sessionEmail: session.user.email,
       archivoNombre: archivo?.name,
       archivoTamaño: archivo?.size
     });
@@ -111,7 +119,7 @@ export async function POST(request, { params }) {
     }
 
     // Buscar alumno
-    let alumno = await prisma.user.findUnique({
+    const alumno = await prisma.user.findUnique({
       where: { email: alumnoEmail },
     });
 

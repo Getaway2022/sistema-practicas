@@ -35,30 +35,30 @@ const useNovedades = (cursoId) => {
   const [novedades, setNovedades] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!cursoId) return;
-    const fetchNovedades = async () => {  // ✅ Correcto
-      try {
-        const res = await fetch(`/api/novedades/${cursoId}`);  // ✅ URL correcta
-        const response = await res.json();
-        
-        if (response.success && response.data) {
-          setNovedades(response.data);  // ✅ setNovedades correcto
-        } else if (Array.isArray(response)) {
-          setNovedades(response);  // ✅ Correcto
-        } else {
-          console.error('Formato de respuesta inesperado:', response);
-          setNovedades([]);  // ✅ Correcto
-        }
-      } catch (error) {
-        console.error('Error:', error);
-        setNovedades([]);  // ✅ Correcto
-      } finally {
-        setLoading(false);
+ useEffect(() => {
+  if (!cursoId) return;
+  const fetchNovedades = async () => {
+    try {
+      const res = await fetch(`/api/novedades/${cursoId}`);
+      const response = await res.json();
+      
+      if (response.success && response.data) {
+        setNovedades(response.data);
+      } else if (Array.isArray(response)) {
+        setNovedades(response);
+      } else {
+        console.error('Formato de respuesta inesperado:', response);
+        setNovedades([]);
       }
-    };
-    fetchNovedades();
-  }, [cursoId]);
+    } catch (error) {
+      console.error('Error:', error);
+      setNovedades([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+  fetchNovedades();
+}, [cursoId]);
 
   const crearNovedad = useCallback(async (contenido) => {
     if (!contenido.trim()) return false;
@@ -93,7 +93,6 @@ const useContratos = (cursoId, alumnoEmail) => {
       const res = await fetch(`/api/contratos/${cursoId}`);
       const response = await res.json();
       
-      // ✅ Validar que sea array
       if (response.success && response.data) {
         setContratos(Array.isArray(response.data) ? response.data : []);
       } else if (Array.isArray(response)) {
@@ -104,7 +103,7 @@ const useContratos = (cursoId, alumnoEmail) => {
       }
     } catch (error) {
       console.error('Error:', error);
-      setContratos([]);  // ✅ Asegurar array vacío
+      setContratos([]);
     } finally {
       setLoading(false);
     }
@@ -114,38 +113,53 @@ const useContratos = (cursoId, alumnoEmail) => {
 
     const subirContrato = useCallback(async (archivo) => {
   if (!archivo) return { success: false, error: 'No hay archivo' };
-  if (!alumnoEmail) return { success: false, error: 'No se pudo obtener el email del usuario' };  // ✅ Nueva validación
   
-  // ... validaciones ...
+  if (!alumnoEmail) {
+    alert('🔍 DEBUG: alumnoEmail está vacío o null');
+    return { success: false, error: 'No se pudo obtener el email del usuario' };
+  }
+  
+  alert(`🔍 DEBUG: Iniciando subida\nEmail: ${alumnoEmail}\nArchivo: ${archivo.name}`);
+  
+  if (archivo.type !== 'application/pdf') {
+    return { success: false, error: 'Solo se permiten archivos PDF' };
+  }
+  if (archivo.size > 10 * 1024 * 1024) {
+    return { success: false, error: 'El archivo no debe superar los 10MB' };
+  }
 
   try {
     const formData = new FormData();
     formData.append('archivo', archivo);
     formData.append('alumnoEmail', alumnoEmail);
 
-    console.log('📤 Subiendo contrato...', { cursoId, alumnoEmail, archivo: archivo.name });  // ✅ Log mejorado
+    console.log('📤 Subiendo contrato...', { cursoId, alumnoEmail, archivo: archivo.name });
 
     const res = await fetch(`/api/contratos/${cursoId}`, {
       method: 'POST',
       body: formData,
     });
 
-    const responseData = await res.json();  // ✅ Parsear primero
-    console.log('📥 Respuesta del servidor:', responseData);  // ✅ Log de respuesta
+    alert(`🔍 DEBUG: Respuesta recibida\nStatus: ${res.status}`);
+
+    const responseData = await res.json();
+    console.log('📥 Respuesta del servidor:', responseData);
 
     if (res.ok) {
       const contrato = responseData.data || responseData;
-      setContratos((prev) => [contrato, ...prev]);  // ✅ Agregar solo data
+      setContratos((prev) => [contrato, ...prev]);
       return { success: true };
     } else {
+      alert(`🔍 DEBUG: Error del servidor\n${responseData.error || responseData.message}`);
       return { 
         success: false, 
-        error: responseData.error || responseData.message || 'Error al subir'  // ✅ Mejor manejo
+        error: responseData.error || responseData.message || 'Error al subir' 
       };
     }
   } catch (error) {
     console.error('❌ Error al subir contrato:', error);
-    return { success: false, error: 'Error de conexión: ' + error.message };  // ✅ Mensaje específico
+    alert(`🔍 DEBUG: Error en catch\n${error.message}\n${error.stack}`);
+    return { success: false, error: 'Error de conexión: ' + error.message };
   }
 }, [cursoId, alumnoEmail]);
 

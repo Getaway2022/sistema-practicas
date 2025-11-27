@@ -1,6 +1,8 @@
 import prisma from '@/lib/prisma';
 import { put } from '@vercel/blob';
 import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
 
 // ============================================
 // HELPERS DE RESPUESTA
@@ -76,9 +78,7 @@ export async function POST(req, context) {
   console.log('[API] 📝 Iniciando registro de contrato');
 
   try {
-    // ✅ NUEVO: Obtener sesión primero
-    const { getServerSession } = await import('next-auth/next');
-    const { authOptions } = await import('@/lib/auth');
+    // Obtener sesión del servidor
     const session = await getServerSession(authOptions);
 
     console.log('[API] 🔐 Sesión:', { 
@@ -87,6 +87,7 @@ export async function POST(req, context) {
       role: session?.user?.role 
     });
 
+    // Validar sesión
     if (!session?.user?.email) {
       console.log('[API] ❌ No hay sesión válida');
       return errorResponse('Debes iniciar sesión para subir contratos', 401);
@@ -102,26 +103,20 @@ export async function POST(req, context) {
     const formData = await req.formData();
     const archivo = formData.get('archivo');
     
-    // ✅ USAR EMAIL DE LA SESIÓN en lugar del FormData
+    // Usar email de la sesión del servidor
     const alumnoEmail = session.user.email;
 
     console.log('[API] 📦 Datos recibidos:', { 
       cursoId,
       alumnoEmail,
       archivoNombre: archivo?.name,
-      archivoTamaño: archivo?.size,
-      formDataKeys: Array.from(formData.keys())
+      archivoTamaño: archivo?.size
     });
 
     // ============================================
     // VALIDACIONES
     // ============================================
     
-    if (!alumnoEmail || alumnoEmail.trim() === '') {
-      console.log('[API] ❌ Email de alumno no proporcionado');
-      return errorResponse('El email del alumno es obligatorio', 400);
-    }
-
     if (!archivo) {
       console.log('[API] ❌ No se proporcionó archivo');
       return errorResponse('No se proporcionó archivo', 400);
@@ -145,15 +140,15 @@ export async function POST(req, context) {
     console.log('[API] ✅ Validación exitosa');
 
     // ============================================
-    // BUSCAR O CREAR ALUMNO
+    // BUSCAR ALUMNO
     // ============================================
     
-    let alumno = await prisma.user.findUnique({
-      where: { email: alumnoEmail.trim() },
+    const alumno = await prisma.user.findUnique({
+      where: { email: alumnoEmail },
     });
 
     if (!alumno) {
-      console.log('[API] 👤 Alumno no encontrado, buscando por email...');
+      console.log('[API] ❌ Usuario no encontrado:', alumnoEmail);
       return errorResponse('Usuario no encontrado. Asegúrate de haber iniciado sesión correctamente.', 404);
     }
 
