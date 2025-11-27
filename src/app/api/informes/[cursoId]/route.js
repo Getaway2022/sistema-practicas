@@ -2,9 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from "@/lib/auth";
 import prisma from '../../../../lib/prisma';
-import { writeFile, mkdir } from 'fs/promises';
-import { existsSync } from 'fs';
-import path from 'path';
+import { put } from '@vercel/blob'; // 👈 ÚNICO CAMBIO: Importar Vercel Blob
 
 // GET: Obtener todos los informes de un curso
 export async function GET(request, { params }) {
@@ -110,37 +108,28 @@ export async function POST(request, { params }) {
       return NextResponse.json({ error: 'Ya tienes un informe subido para este curso' }, { status: 400 });
     }
 
-    // Guardar el archivo en el servidor
-    const bytes = await archivo.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-
+    // ========================================
+    // 👇 CAMBIO PRINCIPAL: Subir a Vercel Blob
+    // ========================================
     // Crear nombre único y seguro para el archivo
     const timestamp = Date.now();
     const fileName = `${timestamp}_${session.user.id}_${archivo.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
     
-    // Definir la ruta del directorio
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'informes');
-    
-    // Crear el directorio si no existe
-    if (!existsSync(uploadDir)) {
-      await mkdir(uploadDir, { recursive: true });
-    }
+    // Subir a Vercel Blob en lugar del sistema de archivos
+    const blob = await put(`informes/${fileName}`, archivo, {
+      access: 'public',
+    });
 
-    // Ruta completa del archivo
-    const filePath = path.join(uploadDir, fileName);
-    
-    // Guardar el archivo
-    await writeFile(filePath, buffer);
-
-    // URL pública del archivo
-    const archivoUrl = `/uploads/informes/${fileName}`;
+    // URL del archivo en Vercel Blob
+    const archivoUrl = blob.url;
+    // ========================================
 
     // Crear el informe en la base de datos
     const nuevoInforme = await prisma.informe.create({
       data: {
         cursoId,
         alumnoId: session.user.id,
-        archivo: archivoUrl,
+        archivo: archivoUrl, // 👈 Guardar URL de Vercel Blob
         estado: 'PENDIENTE',
       },
       include: {
