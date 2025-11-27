@@ -35,32 +35,30 @@ const useNovedades = (cursoId) => {
   const [novedades, setNovedades] = useState([]);
   const [loading, setLoading] = useState(true);
 
-useEffect(() => {
-  if (!cursoId) return;
-  const fetchContratos = async () => {
-    try {
-      const res = await fetch(`/api/contratos/${cursoId}`);
-      const response = await res.json();
-      
-      // ✅ Verificar si la respuesta tiene el formato esperado
-      if (response.success && response.data) {
-        setContratos(response.data);
-      } else if (Array.isArray(response)) {
-        // Por si acaso la API devuelve directamente un array
-        setContratos(response);
-      } else {
-        console.error('Formato de respuesta inesperado:', response);
-        setContratos([]);
+  useEffect(() => {
+    if (!cursoId) return;
+    const fetchNovedades = async () => {
+      try {
+        const res = await fetch(`/api/novedades/${cursoId}`);
+        const response = await res.json();
+        
+        if (response.success && response.data) {
+          setNovedades(response.data);
+        } else if (Array.isArray(response)) {
+          setNovedades(response);
+        } else {
+          console.error('Formato de respuesta inesperado:', response);
+          setNovedades([]);
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        setNovedades([]);
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Error:', error);
-      setContratos([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-  fetchContratos();
-}, [cursoId]);
+    };
+    fetchNovedades();
+  }, [cursoId]);
 
   const crearNovedad = useCallback(async (contenido) => {
     if (!contenido.trim()) return false;
@@ -88,21 +86,31 @@ const useContratos = (cursoId, alumnoEmail) => {
   const [contratos, setContratos] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!cursoId) return;
-    const fetchContratos = async () => {
-      try {
-        const res = await fetch(`/api/contratos/${cursoId}`);
-        const data = await res.json();
-        setContratos(data);
-      } catch (error) {
-        console.error('Error:', error);
-      } finally {
-        setLoading(false);
+ useEffect(() => {
+  if (!cursoId) return;
+  const fetchContratos = async () => {
+    try {
+      const res = await fetch(`/api/contratos/${cursoId}`);
+      const response = await res.json();
+      
+      // ✅ AGREGADO: Validar que sea array
+      if (response.success && response.data) {
+        setContratos(Array.isArray(response.data) ? response.data : []);
+      } else if (Array.isArray(response)) {
+        setContratos(response);
+      } else {
+        console.error('Formato inesperado:', response);
+        setContratos([]);
       }
-    };
-    fetchContratos();
-  }, [cursoId]);
+    } catch (error) {
+      console.error('Error:', error);
+      setContratos([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+  fetchContratos();
+}, [cursoId]);
 
     const subirContrato = useCallback(async (archivo) => {
     if (!archivo) return { success: false, error: 'No hay archivo' };
@@ -126,10 +134,10 @@ const useContratos = (cursoId, alumnoEmail) => {
       });
 
       if (res.ok) {
-        const nuevoContrato = await res.json();
-        const contrato = nuevoContrato.data || nuevoContrato;
-        setContratos((prev) => [nuevoContrato, ...prev]);
-        return { success: true };
+       const nuevoContrato = await res.json();
+  const contrato = nuevoContrato.data || nuevoContrato;
+  setContratos((prev) => [contrato, ...prev]);  // ✅ CAMBIO: era nuevoContrato
+  return { success: true };
       } else {
         const error = await res.json();
         return { success: false, error: error.error || 'Error al subir' };
@@ -189,14 +197,13 @@ const useInformes = (cursoId, alumnoEmail) => {
       const res = await fetch(`/api/informes/${cursoId}`);
       const response = await res.json();
       
-      // ✅ Verificar si la respuesta tiene el formato esperado
+      // ✅ AGREGADO: Validar que sea array
       if (response.success && response.data) {
-        setInformes(response.data);
+        setInformes(Array.isArray(response.data) ? response.data : []);
       } else if (Array.isArray(response)) {
-        // Por si acaso la API devuelve directamente un array
         setInformes(response);
       } else {
-        console.error('Formato de respuesta inesperado:', response);
+        console.error('Formato inesperado:', response);
         setInformes([]);
       }
     } catch (error) {
@@ -233,8 +240,7 @@ const useInformes = (cursoId, alumnoEmail) => {
       if (res.ok) {
         const nuevoInforme = await res.json();
         const informe = nuevoInforme.data || nuevoInforme;
-
-        setInformes((prev) => [nuevoInforme, ...prev]);
+       setInformes((prev) => [informe, ...prev]);
         return { success: true };
       } else {
         const error = await res.json();
