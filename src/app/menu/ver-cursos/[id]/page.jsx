@@ -129,7 +129,7 @@ const useContratos = (cursoId, alumnoEmail) => {
 
   const formData = new FormData();
   formData.append("archivo", safeFile);
-  formData.append("alumnoEmail", alumnoEmail);
+  
 
   try {
     const res = await fetch(`/api/contratos/${cursoId}`, {
@@ -992,8 +992,7 @@ export default function CursoDetallePage() {
   if (!session) return <UnauthorizedScreen />;
   if (cursoLoading || !curso) return <LoadingScreen message="Cargando curso..." />;
 
-  // ✅ DEBUGGING: Ver en consola
-  console.log('🔍 Session:', { email: alumnoEmail, role: user?.role });
+
 
   return (
     <div className="min-h-screen text-white bg-gradient-to-br from-black via-blue-950 to-black">
@@ -1035,3 +1034,4 @@ export default function CursoDetallePage() {
     </div>
   );
 }
+
