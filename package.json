@@ -5,11 +5,13 @@
   "main": "electron.cjs",
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
     "electron": "electron .",
-    "electron:build": "electron-builder"
+    "electron:build": "electron-builder",
+    "vercel-build": "prisma generate && next build",
+    "postinstall": "prisma generate"
   },
   "prisma": {
     "seed": "node scripts/seed.js"

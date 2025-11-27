@@ -1,9 +1,7 @@
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
-import { PrismaClient } from "@prisma/client";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcrypt";
-
-const prisma = new PrismaClient();
+import prisma from "./prisma"; // Usa import default
 
 export const authOptions = {
   adapter: PrismaAdapter(prisma),
@@ -15,6 +13,10 @@ export const authOptions = {
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) {
+          throw new Error("Credenciales inválidas");
+        }
+
         const user = await prisma.user.findUnique({
           where: { email: credentials.email },
         });
@@ -29,7 +31,7 @@ export const authOptions = {
     }),
   ],
   callbacks: {
-    async session({ session, token, user }) {
+    async session({ session, token }) {
       if (session?.user) {
         session.user.id = token.sub;
         session.user.role = token.role;

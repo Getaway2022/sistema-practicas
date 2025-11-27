@@ -1,12 +1,9 @@
-// app/api/contratos/[cursoId]/route.js
-import { PrismaClient } from '@prisma/client';
+import prisma from '@/lib/prisma'; // ✅ Usar el cliente singleton
 import { put } from '@vercel/blob';
 import { NextResponse } from 'next/server';
 
-const prisma = new PrismaClient();
-
 // ============================================
-// HELPERS DE RESPUESTA (como Oportunidades)
+// HELPERS DE RESPUESTA
 // ============================================
 
 function successResponse(data, message = 'Operación exitosa', status = 200) {
@@ -69,7 +66,7 @@ export async function GET(req, context) {
 }
 
 // ============================================
-// POST - Crear contrato (SIN AUTENTICACIÓN)
+// POST - Crear contrato
 // ============================================
 export async function POST(req, context) {
   console.log('[API] 📝 Iniciando registro de contrato');
@@ -90,7 +87,7 @@ export async function POST(req, context) {
     });
 
     // ============================================
-    // VALIDACIONES (como Oportunidades)
+    // VALIDACIONES
     // ============================================
     
     if (!alumnoEmail || !alumnoEmail.trim()) {
@@ -131,7 +128,7 @@ export async function POST(req, context) {
           email: alumnoEmail.trim(),
           name: alumnoEmail.split('@')[0],
           role: 'STUDENT',
-          password: '', // Sin password, creado por sistema externo
+          password: '',
         },
       });
     }

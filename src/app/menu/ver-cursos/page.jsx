@@ -3,7 +3,7 @@ import { authOptions } from '@/lib/auth';
 import { PrismaClient } from "@prisma/client";
 import VerCursosClient from "./VerCursosClient";
 
-const prisma = new PrismaClient();
+import prisma from '@/lib/prisma';
 
 /**
  * VerCursosPage - Server Component (Wrapper)
