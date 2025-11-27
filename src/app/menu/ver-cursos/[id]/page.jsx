@@ -35,21 +35,32 @@ const useNovedades = (cursoId) => {
   const [novedades, setNovedades] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!cursoId) return;
-    const fetchNovedades = async () => {
-      try {
-        const res = await fetch(`/api/novedades/${cursoId}`);
-        const data = await res.json();
-        setNovedades(data);
-      } catch (error) {
-        console.error('Error:', error);
-      } finally {
-        setLoading(false);
+useEffect(() => {
+  if (!cursoId) return;
+  const fetchContratos = async () => {
+    try {
+      const res = await fetch(`/api/contratos/${cursoId}`);
+      const response = await res.json();
+      
+      // ✅ Verificar si la respuesta tiene el formato esperado
+      if (response.success && response.data) {
+        setContratos(response.data);
+      } else if (Array.isArray(response)) {
+        // Por si acaso la API devuelve directamente un array
+        setContratos(response);
+      } else {
+        console.error('Formato de respuesta inesperado:', response);
+        setContratos([]);
       }
-    };
-    fetchNovedades();
-  }, [cursoId]);
+    } catch (error) {
+      console.error('Error:', error);
+      setContratos([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+  fetchContratos();
+}, [cursoId]);
 
   const crearNovedad = useCallback(async (contenido) => {
     if (!contenido.trim()) return false;
@@ -116,6 +127,7 @@ const useContratos = (cursoId, alumnoEmail) => {
 
       if (res.ok) {
         const nuevoContrato = await res.json();
+        const contrato = nuevoContrato.data || nuevoContrato;
         setContratos((prev) => [nuevoContrato, ...prev]);
         return { success: true };
       } else {
@@ -171,20 +183,31 @@ const useInformes = (cursoId, alumnoEmail) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!cursoId) return;
-    const fetchInformes = async () => {
-      try {
-        const res = await fetch(`/api/informes/${cursoId}`);
-        const data = await res.json();
-        setInformes(data);
-      } catch (error) {
-        console.error('Error:', error);
-      } finally {
-        setLoading(false);
+  if (!cursoId) return;
+  const fetchInformes = async () => {
+    try {
+      const res = await fetch(`/api/informes/${cursoId}`);
+      const response = await res.json();
+      
+      // ✅ Verificar si la respuesta tiene el formato esperado
+      if (response.success && response.data) {
+        setInformes(response.data);
+      } else if (Array.isArray(response)) {
+        // Por si acaso la API devuelve directamente un array
+        setInformes(response);
+      } else {
+        console.error('Formato de respuesta inesperado:', response);
+        setInformes([]);
       }
-    };
-    fetchInformes();
-  }, [cursoId]);
+    } catch (error) {
+      console.error('Error:', error);
+      setInformes([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+  fetchInformes();
+}, [cursoId]);
 
   const subirInforme = useCallback(async (archivo) => {
     if (!archivo) return { success: false, error: 'No hay archivo' };
@@ -209,6 +232,8 @@ const useInformes = (cursoId, alumnoEmail) => {
 
       if (res.ok) {
         const nuevoInforme = await res.json();
+        const informe = nuevoInforme.data || nuevoInforme;
+
         setInformes((prev) => [nuevoInforme, ...prev]);
         return { success: true };
       } else {
