@@ -37,20 +37,41 @@ export async function GET(request, { params }) {
     }
 
     // Si es estudiante, solo obtener sus propios informes
-    if (session.user.role === 'STUDENT') {
-      const informes = await prisma.informe.findMany({
-        where: {
-          cursoId,
-          alumnoId: session.user.id,
-        },
-        orderBy: { createdAt: 'desc' },
-      });
+   if (session.user.role === 'STUDENT') {
+  // Primero buscar el alumno por email
+  const alumno = await prisma.user.findUnique({
+    where: { email: session.user.email }
+  });
 
-      return NextResponse.json({
-        success: true,
-        data: informes
-      });
-    }
+  if (!alumno) {
+    return NextResponse.json({ 
+      success: false,
+      error: 'Usuario no encontrado' 
+    }, { status: 404 });
+  }
+
+  const informes = await prisma.informe.findMany({
+    where: {
+      cursoId,
+      alumnoId: alumno.id, // 👈 Usar alumno.id en lugar de session.user.id
+    },
+    include: {
+      alumno: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  return NextResponse.json({
+    success: true,
+    data: informes
+  });
+}
 
     return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
   } catch (error) {

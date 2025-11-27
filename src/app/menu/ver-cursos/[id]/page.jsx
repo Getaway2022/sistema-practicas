@@ -270,7 +270,9 @@ const useInformes = (cursoId, alumnoEmail) => {
         body: JSON.stringify({ estado, feedback }),
       });
       if (res.ok) {
-        const actualizado = await res.json();
+         const result = await res.json();
+      const actualizado = result.data || result;
+        
         setInformes((prev) =>
           prev.map((i) => (i.id === informeId ? actualizado : i))
         );

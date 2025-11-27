@@ -1,55 +1,68 @@
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import CredentialsProvider from "next-auth/providers/credentials";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import prisma from "./prisma"; // Usa import default
 
 export const authOptions = {
   adapter: PrismaAdapter(prisma),
   providers: [
     CredentialsProvider({
-      name: "credentials",
+      name: "Credentials",
       credentials: {
         email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
+        password: { label: "Password", type: "password" }
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
-          throw new Error("Credenciales inválidas");
+          throw new Error("Email y contraseña son requeridos");
         }
 
         const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
+          where: { email: credentials.email }
         });
 
-        if (!user) throw new Error("Usuario no encontrado");
+        if (!user || !user.password) {
+          throw new Error("Credenciales inválidas");
+        }
 
-        const isValid = await bcrypt.compare(credentials.password, user.password);
-        if (!isValid) throw new Error("Contraseña incorrecta");
+        const isPasswordValid = await bcrypt.compare(
+          credentials.password,
+          user.password
+        );
 
-        return user;
-      },
-    }),
-  ],
-  callbacks: {
-    async session({ session, token }) {
-      if (session?.user) {
-        session.user.id = token.sub;
-        session.user.role = token.role;
+        if (!isPasswordValid) {
+          throw new Error("Credenciales inválidas");
+        }
+
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role
+        };
       }
-      return session;
-    },
+    })
+  ],
+  session: {
+    strategy: "jwt"
+  },
+  callbacks: {
     async jwt({ token, user }) {
       if (user) {
         token.role = user.role;
+        token.id = user.id;
       }
       return token;
     },
-  },
-  session: {
-    strategy: "jwt",
+    async session({ session, token }) {
+      if (token && session.user) {
+        session.user.role = token.role;
+        session.user.id = token.id;
+      }
+      return session;
+    }
   },
   pages: {
-    signIn: "/login",
-  },
-  secret: process.env.NEXTAUTH_SECRET,
+    signIn: "/login"
+  }
 };
