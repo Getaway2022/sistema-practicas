@@ -111,58 +111,53 @@ const useContratos = (cursoId, alumnoEmail) => {
   fetchContratos();
 }, [cursoId]);
 
-    const subirContrato = useCallback(async (archivo) => {
+   const subirContrato = useCallback(async (archivo) => {
   if (!archivo) return { success: false, error: 'No hay archivo' };
-  
-  if (!alumnoEmail) {
-    alert('🔍 DEBUG: alumnoEmail está vacío o null');
-    return { success: false, error: 'No se pudo obtener el email del usuario' };
-  }
-  
-  alert(`🔍 DEBUG: Iniciando subida\nEmail: ${alumnoEmail}\nArchivo: ${archivo.name}`);
-  
-  if (archivo.type !== 'application/pdf') {
-    return { success: false, error: 'Solo se permiten archivos PDF' };
-  }
-  if (archivo.size > 10 * 1024 * 1024) {
+  if (!alumnoEmail) return { success: false, error: 'No se pudo obtener el email' };
+
+  console.log("📁 Archivo seleccionado:", {
+    name: archivo.name,
+    type: archivo.type,
+    size: archivo.size,
+    instance: archivo instanceof File
+  });
+
+  // ⛔ Electron borra archivo.type y archivo.size
+  // ⛑ Lo reconstruimos
+  const safeFile = new File(
+    [archivo],
+    archivo.name || "contrato.pdf",
+    { type: archivo.type || "application/pdf" }
+  );
+
+  // límite de tamaño real
+  if (safeFile.size > 10 * 1024 * 1024) {
     return { success: false, error: 'El archivo no debe superar los 10MB' };
   }
 
+  const formData = new FormData();
+  formData.append("archivo", safeFile);
+  formData.append("alumnoEmail", alumnoEmail);
+
   try {
-    const formData = new FormData();
-    formData.append('archivo', archivo);
-    formData.append('alumnoEmail', alumnoEmail);
-
-    console.log('📤 Subiendo contrato...', { cursoId, alumnoEmail, archivo: archivo.name });
-
     const res = await fetch(`/api/contratos/${cursoId}`, {
-      method: 'POST',
+      method: "POST",
       body: formData,
     });
 
-    alert(`🔍 DEBUG: Respuesta recibida\nStatus: ${res.status}`);
+    const response = await res.json();
 
-    const responseData = await res.json();
-    console.log('📥 Respuesta del servidor:', responseData);
-
-    if (res.ok) {
-      const contrato = responseData.data || responseData;
-      setContratos((prev) => [contrato, ...prev]);
-      return { success: true };
-    } else {
-      alert(`🔍 DEBUG: Error del servidor\n${responseData.error || responseData.message}`);
-      return { 
-        success: false, 
-        error: responseData.error || responseData.message || 'Error al subir' 
-      };
+    if (!res.ok) {
+      return { success: false, error: response.error || "Error al subir" };
     }
-  } catch (error) {
-    console.error('❌ Error al subir contrato:', error);
-    alert(`🔍 DEBUG: Error en catch\n${error.message}\n${error.stack}`);
-    return { success: false, error: 'Error de conexión: ' + error.message };
+
+    setContratos(prev => [response.data, ...prev]);
+    return { success: true };
+
+  } catch (e) {
+    return { success: false, error: 'Error de conexión: ' + e.message };
   }
 }, [cursoId, alumnoEmail]);
-
   const actualizarContrato = useCallback(async (contratoId, estado, comentario = '') => {
     try {
       const res = await fetch(`/api/contratos/${cursoId}/${contratoId}`, {
@@ -238,7 +233,7 @@ const useInformes = (cursoId, alumnoEmail) => {
 
   try {
     const formData = new FormData();
-    formData.append('archivo', archivo);
+    formData.append('archivo', realFile);
     formData.append('alumnoEmail', alumnoEmail);
 
     console.log('📤 Subiendo informe...', { cursoId, alumnoEmail, archivo: archivo.name });  // ✅ Log
