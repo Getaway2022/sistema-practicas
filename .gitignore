@@ -113,3 +113,9 @@ tmp/
 *.tmp
 .vercel
 .env*.local
+# ELECTRON
+# ============================================
+out/
+*.exe
+*.dmg
+*.AppImage
