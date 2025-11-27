@@ -231,17 +231,18 @@ const useInformes = (cursoId, alumnoEmail) => {
   
   // ... validaciones ...
 
-  try {
+ try {
     const formData = new FormData();
-    formData.append('archivo', realFile);
+    formData.append('archivo', archivo);  // ← Usar "archivo"
     formData.append('alumnoEmail', alumnoEmail);
+  
 
     console.log('📤 Subiendo informe...', { cursoId, alumnoEmail, archivo: archivo.name });  // ✅ Log
 
     const res = await fetch(`/api/informes/${cursoId}`, {
       method: 'POST',
       body: formData,
-    });
+    }); 
 
     const responseData = await res.json();  // ✅ Parsear primero
     console.log('📥 Respuesta del servidor:', responseData);  // ✅ Log
