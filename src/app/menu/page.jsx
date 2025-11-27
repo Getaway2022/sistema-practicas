@@ -4,8 +4,7 @@ import Link from "next/link";
 import { PrismaClient } from "@prisma/client";
 import OportunidadCard from "./OportunidadCard";
 import MenuPageClient from "./MenuPageClient";
-
-const prisma = new PrismaClient();
+import prisma from '@/lib/prisma';
 
 // ============================================
 // CONFIGURACIÓN Y CONSTANTES

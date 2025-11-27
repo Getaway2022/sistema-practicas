@@ -3,7 +3,7 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
 
-const prisma = new PrismaClient();
+import prisma from '@/lib/prisma';
 
 async function main() {
   const passwordHash = await bcrypt.hash('123456', 10); // Contraseña por defecto
