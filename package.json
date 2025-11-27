@@ -41,23 +41,23 @@
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.18"
   },
-"build": {
-  "appId": "com.sistemapracticas.app",
-  "productName": "Sistema de Prácticas",
-  "win": {
-    "target": "nsis",
-    "icon": "public/favicon.ico"
-  },
-  "files": [
-    "electron.cjs",
-    "public/**/*",
-    "!node_modules/**/*"
-  ],
-  "directories": {
-    "output": "dist"
-  },
-  "buildDependenciesFromSource": false,
-  "npmRebuild": false,
-  "nodeGypRebuild": false
-}
+  "build": {
+    "appId": "com.sistemapracticas.app",
+    "productName": "Sistema de Prácticas",
+    "win": {
+      "target": "nsis",
+      "icon": "public/favicon.ico"
+    },
+    "files": [
+      "electron.cjs",
+      "public/**/*",
+      "!node_modules/**/*"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "buildDependenciesFromSource": false,
+    "npmRebuild": false,
+    "nodeGypRebuild": false
+  }
 }
