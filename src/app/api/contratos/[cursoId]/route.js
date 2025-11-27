@@ -1,5 +1,5 @@
 // app/api/contratos/[cursoId]/route.js
-// app/api/contratos/[cursoId]/route.js
+
 import prisma from '@/lib/prisma'; // ✅ CAMBIO 1: Usar singleton en lugar de new PrismaClient()
 import { put, del } from '@vercel/blob';
 import { NextResponse } from 'next/server';
