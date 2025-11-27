@@ -41,7 +41,6 @@
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.18"
   },
-<<<<<<< HEAD
   "build": {
     "appId": "com.sistemapracticas.app",
     "productName": "Sistema de Prácticas",
@@ -54,31 +53,10 @@
       "public/**/*",
       "!node_modules/**/*"
     ],
+    "asarUnpack": [],
     "directories": {
       "output": "dist"
     },
-    "buildDependenciesFromSource": false,
-    "npmRebuild": false,
     "nodeGypRebuild": false
   }
-=======
- "build": {
-  "appId": "com.sistemapracticas.app",
-  "productName": "Sistema de Prácticas",
-  "win": {
-    "target": "nsis",
-    "icon": "public/favicon.ico"
-  },
-  "files": [
-    "electron.cjs",
-    "public/**/*",
-    "!node_modules/**/*"
-  ],
-  "asarUnpack": [],
-  "directories": {
-    "output": "dist"
-  },
-  "nodeGypRebuild": false
-}
->>>>>>> f6754f4 (Update API routes with Vercel Blob storage support)
 }
