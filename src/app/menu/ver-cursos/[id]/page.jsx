@@ -86,31 +86,23 @@ const useContratos = (cursoId, alumnoEmail) => {
   const [contratos, setContratos] = useState([]);
   const [loading, setLoading] = useState(true);
 
- useEffect(() => {
-  if (!cursoId) return;
-  const fetchContratos = async () => {
-    try {
-      const res = await fetch(`/api/contratos/${cursoId}`);
-      const response = await res.json();
-      
-      if (response.success && response.data) {
-        setContratos(Array.isArray(response.data) ? response.data : []);
-      } else if (Array.isArray(response)) {
-        setContratos(response);
-      } else {
-        console.error('Formato inesperado:', response);
+  useEffect(() => {
+    if (!cursoId) return;
+    const fetchContratos = async () => {
+      try {
+        const res = await fetch(`/api/contratos/${cursoId}`);
+        const data = await res.json();
+        console.log('📦 Contratos recibidos:', data);
+        setContratos(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error('Error:', error);
         setContratos([]);
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Error:', error);
-      setContratos([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-  fetchContratos();
-}, [cursoId]);
-
+    };
+    fetchContratos();
+  }, [cursoId]);
    const subirContrato = useCallback(async (archivo) => {
   if (!archivo) return { success: false, error: 'No hay archivo' };
   if (!alumnoEmail) return { success: false, error: 'No se pudo obtener el email' };
@@ -158,6 +150,7 @@ const useContratos = (cursoId, alumnoEmail) => {
     return { success: false, error: 'Error de conexión: ' + e.message };
   }
 }, [cursoId, alumnoEmail]);
+
   const actualizarContrato = useCallback(async (contratoId, estado, comentario = '') => {
     try {
       const res = await fetch(`/api/contratos/${cursoId}/${contratoId}`, {
@@ -178,7 +171,7 @@ const useContratos = (cursoId, alumnoEmail) => {
     return false;
   }, [cursoId]);
 
-  const eliminarContrato = useCallback(async (contratoId) => {
+ const eliminarContrato = useCallback(async (contratoId) => {
     try {
       const res = await fetch(`/api/contratos/${cursoId}/${contratoId}`, {
         method: 'DELETE',
@@ -201,67 +194,68 @@ const useInformes = (cursoId, alumnoEmail) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-  if (!cursoId) return;
-  const fetchInformes = async () => {
-    try {
-      const res = await fetch(`/api/informes/${cursoId}`);
-      const response = await res.json();
-      
-      if (response.success && response.data) {
-        setInformes(Array.isArray(response.data) ? response.data : []);  // ✅ Validar array
-      } else if (Array.isArray(response)) {
-        setInformes(response);
-      } else {
-        console.error('Formato inesperado:', response);
+    if (!cursoId) return;
+    const fetchInformes = async () => {
+      try {
+        const res = await fetch(`/api/informes/${cursoId}`);
+        const data = await res.json();
+        console.log('📦 Informes recibidos:', data);
+        setInformes(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error('Error:', error);
         setInformes([]);
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Error:', error);
-      setInformes([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-  fetchInformes();
-}, [cursoId]);
+    };
+    fetchInformes();
+  }, [cursoId]);
 
  const subirInforme = useCallback(async (archivo) => {
-  if (!archivo) return { success: false, error: 'No hay archivo' };
-  if (!alumnoEmail) return { success: false, error: 'No se pudo obtener el email del usuario' };  // ✅ Nueva validación
-  
-  // ... validaciones ...
-
- try {
-    const formData = new FormData();
-    formData.append('archivo', archivo);  // ← Usar "archivo"
-    formData.append('alumnoEmail', alumnoEmail);
-  
-
-    console.log('📤 Subiendo informe...', { cursoId, alumnoEmail, archivo: archivo.name });  // ✅ Log
-
-    const res = await fetch(`/api/informes/${cursoId}`, {
-      method: 'POST',
-      body: formData,
-    }); 
-
-    const responseData = await res.json();  // ✅ Parsear primero
-    console.log('📥 Respuesta del servidor:', responseData);  // ✅ Log
-
-    if (res.ok) {
-      const informe = responseData.data || responseData;
-      setInformes((prev) => [informe, ...prev]);  // ✅ Solo data
-      return { success: true };
-    } else {
-      return { 
-        success: false, 
-        error: responseData.error || responseData.message || 'Error al subir'  // ✅ Mejor manejo
-      };
+    if (!archivo) return { success: false, error: 'No hay archivo' };
+    if (archivo.type !== 'application/pdf') {
+      return { success: false, error: 'Solo se permiten archivos PDF' };
     }
-  } catch (error) {
-    console.error('❌ Error al subir informe:', error);
-    return { success: false, error: 'Error de conexión: ' + error.message };  // ✅ Específico
-  }
-}, [cursoId, alumnoEmail]);
+    if (archivo.size > 10 * 1024 * 1024) {
+      return { success: false, error: 'El archivo no debe superar los 10MB' };
+    }
+
+    if (!alumnoEmail) {
+      console.error('❌ alumnoEmail no disponible');
+      return { success: false, error: 'Email de usuario no disponible. Inicia sesión nuevamente.' };
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('archivo', archivo);
+      formData.append('alumnoEmail', alumnoEmail);
+
+      console.log('📤 Subiendo informe...', { 
+        cursoId, 
+        alumnoEmail,
+        archivoNombre: archivo.name 
+      });
+
+      const res = await fetch(`/api/informes/${cursoId}`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json();
+      console.log('📦 Respuesta del servidor:', data);
+
+      if (res.ok) {
+        setInformes((prev) => [data, ...prev]);
+        return { success: true };
+      } else {
+        console.error('❌ Error del servidor:', data);
+        return { success: false, error: data.error || 'Error al subir' };
+      }
+    } catch (error) {
+      console.error('❌ Error de conexión:', error);
+      return { success: false, error: 'Error de conexión' };
+    }
+  }, [cursoId, alumnoEmail]);
 
   const actualizarInforme = useCallback(async (informeId, estado, feedback = '') => {
     try {
@@ -271,9 +265,7 @@ const useInformes = (cursoId, alumnoEmail) => {
         body: JSON.stringify({ estado, feedback }),
       });
       if (res.ok) {
-         const result = await res.json();
-      const actualizado = result.data || result;
-        
+        const actualizado = await res.json();
         setInformes((prev) =>
           prev.map((i) => (i.id === informeId ? actualizado : i))
         );
@@ -285,7 +277,8 @@ const useInformes = (cursoId, alumnoEmail) => {
     return false;
   }, [cursoId]);
 
-  const eliminarInforme = useCallback(async (informeId) => {
+
+   const eliminarInforme = useCallback(async (informeId) => {
     try {
       const res = await fetch(`/api/informes/${cursoId}/${informeId}`, {
         method: 'DELETE',
@@ -965,6 +958,11 @@ export default function CursoDetallePage() {
   
   // ✅ AGREGADO: Obtener email del usuario
   const alumnoEmail = session?.user?.email;
+  console.log('🔍 Sesión actual:', { 
+    existe: !!session,
+    email: alumnoEmail,
+    role: session?.user?.role 
+  });
   
   // ✅ MODIFICADO: Pasar alumnoEmail a los hooks
   const {
