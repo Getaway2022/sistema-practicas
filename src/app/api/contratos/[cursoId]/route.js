@@ -1,13 +1,12 @@
 import { PrismaClient } from '@prisma/client';
-import { writeFile } from 'fs/promises';
-import path from 'path';
-import { v4 as uuid } from 'uuid';
+import { put } from '@vercel/blob'; // 👈 Importa Vercel Blob
 import { getServerSession } from 'next-auth';
 import { authOptions } from "@/lib/auth";
+
 const prisma = new PrismaClient();
 
 export async function GET(req, context) {
-  const params = await context.params; // 👈 Await params
+  const params = await context.params;
   const cursoId = params?.cursoId;
 
   const contratos = await prisma.contrato.findMany({
@@ -19,7 +18,7 @@ export async function GET(req, context) {
 }
 
 export async function POST(req, context) {
-  const params = await context.params; // 👈 Await params
+  const params = await context.params;
   const cursoId = params?.cursoId;
 
   const session = await getServerSession(authOptions);
@@ -46,16 +45,15 @@ export async function POST(req, context) {
     });
   }
 
-  const bytes = await archivo.arrayBuffer();
-  const buffer = Buffer.from(bytes);
-  const filename = `${uuid()}-${archivo.name}`;
-  const filepath = path.join(process.cwd(), 'public', 'uploads', filename);
+  // 👇 CAMBIO AQUÍ: Sube a Vercel Blob en lugar del sistema de archivos
+  const blob = await put(archivo.name, archivo, {
+    access: 'public',
+  });
 
-  await writeFile(filepath, buffer);
-
+  // 👇 Guarda la URL del blob en lugar de la ruta local
   const contrato = await prisma.contrato.create({
     data: {
-      archivo: `/uploads/${filename}`,
+      archivo: blob.url, // 👈 URL completa de Vercel Blob
       estado: 'PENDIENTE',
       alumnoId: alumno.id,
       cursoId,
