@@ -116,20 +116,17 @@ const useContratos = (cursoId, alumnoEmail) => {
 
   // ⛔ Electron borra archivo.type y archivo.size
   // ⛑ Lo reconstruimos
-  const safeFile = new File(
-    [archivo],
-    archivo.name || "contrato.pdf",
-    { type: archivo.type || "application/pdf" }
-  );
+  if (archivo.type !== 'application/pdf') {
+    return { success: false, error: 'Solo se permiten archivos PDF' };
+  }
 
   // límite de tamaño real
-  if (safeFile.size > 10 * 1024 * 1024) {
+   if (archivo.size > 10 * 1024 * 1024) {
     return { success: false, error: 'El archivo no debe superar los 10MB' };
   }
 
-  const formData = new FormData();
-  formData.append("archivo", safeFile);
-  
+ const formData = new FormData();
+  formData.append("archivo", archivo);
 
   try {
     const res = await fetch(`/api/contratos/${cursoId}`, {
@@ -228,11 +225,9 @@ const useInformes = (cursoId, alumnoEmail) => {
     try {
       const formData = new FormData();
       formData.append('archivo', archivo);
-      formData.append('alumnoEmail', alumnoEmail);
 
       console.log('📤 Subiendo informe...', { 
         cursoId, 
-        alumnoEmail,
         archivoNombre: archivo.name 
       });
 
