@@ -2,7 +2,7 @@
   "name": "sistema-practicas",
   "version": "1.0.0",
   "private": true,
-  "main": "electron.js",
+  "main": "electron.cjs",
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
