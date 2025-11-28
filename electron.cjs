@@ -19,7 +19,7 @@ function createWindow() {
   });
 
   // URL de tu app en Vercel
-  const APP_URL = 'https://sistema-practicas-aigbaxspu-getaway2022s-projects.vercel.app';
+  const APP_URL = 'https://sistema-practicas.vercel.app';
   
   mainWindow.loadURL(APP_URL);
 
